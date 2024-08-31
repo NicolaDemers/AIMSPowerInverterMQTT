@@ -9,6 +9,40 @@ def log(message):
     print(message)
     syslog.syslog(message)  
 
+def interpolate_battery_percentage(voltage, battery_type):
+    # Define the battery voltage to percentage table
+    tables = {
+        "LiFePO4": [
+            (100, 100),
+            (13.6, 100),
+            (13.4, 90),
+            (13.3, 80),
+            (13.2, 70),
+            (13.1, 60),
+            (13.0, 50),
+            (13.0, 40),
+            (12.9, 30),
+            (12.8, 20),
+            (12.0, 10),
+            (10.0, 0)
+        ]
+        # Add other battery types and their tables if needed
+    }
+    
+    if battery_type not in tables:
+        raise ValueError(f"Unsupported battery type: {battery_type}")
+    
+    table = tables[battery_type]
+    
+    # Linear interpolation
+    for i in range(len(table) - 1):
+        (v1, p1) = table[i]
+        (v2, p2) = table[i + 1]
+        if v1 >= voltage >= v2:
+            return p1 + (p2 - p1) * (voltage - v2) / (v1 - v2)
+    
+    return 0  # Default to 0 if voltage is out of range
+
 log("AIMSPowerInverterMQTT by Steve Sinchak")
 log("Opening config.yaml file at /opt/AIMSPowerInverterMQTT")
 with open('/opt/AIMSPowerInverterMQTT/config.yaml', 'r') as f:
@@ -24,6 +58,7 @@ baseTopic=config["baseTopic"]
 modelTopic=config["modelTopic"]
 expireAfter=str(config["expireAfter"])
 deviceDetailsJSON=str(config["deviceDetailsJSON"])
+batteryType=config.get("batteryType", "LiFePO4")  # Default to LiFePO4 if not specified
 
 try:
     #Baudrate must be set to 2400 according to AIMS power specifications!
@@ -116,6 +151,8 @@ try:
     ups_status_testing=bool(int(ups_status[5]))
     ups_status_shutdown=bool(int(ups_status[6]))
     ups_status_beep_enabled=bool(int(ups_status[7]))
+
+    battery_percentage = interpolate_battery_percentage(float(battery_voltage), batteryType)
 
     log("Sending Inverter Data to Home Assistant over MQTT")
 
@@ -217,6 +254,10 @@ try:
     #Decoded Binary Beep Enabled
     mqttHAAutodiscoveryPub(client,baseTopic,modelTopic,"Inverter UPS Beep Enabled","binary_sensor",None,None,None,expireAfter,deviceDetailsJSON)
     mqttStateValuePub(client,baseTopic,modelTopic,"Inverter UPS Beep Enabled",ups_status_beep_enabled)
+
+    # Battery Percentage
+    mqttHAAutodiscoveryPub(client, baseTopic, modelTopic, "Battery Percentage", "sensor", "battery", "%", "measurement", expireAfter, deviceDetailsJSON)
+    mqttStateValuePub(client, baseTopic, modelTopic, "Battery Percentage", battery_percentage)
 
     #clean up
     log("Disconnecting...")

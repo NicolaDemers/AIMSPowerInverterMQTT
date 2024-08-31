@@ -13,3 +13,5 @@ baseTopic: AimsPower
 #Customize the following for your specific model but be careful not to alter the JSON formatting
 modelTopic: Aims1250PowerInverter
 deviceDetailsJSON: '{"identifiers": "Aims1250PowerInverter", "manufacturer": "AIMS Power", "model": "PICOGLF12W12V120AL", "name": "AIMS 1250W Power Inverter", "sw_version": "1.0"}'
+
+batteryType: "LiFePO4"
